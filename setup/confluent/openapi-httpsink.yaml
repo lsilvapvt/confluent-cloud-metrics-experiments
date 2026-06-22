@@ -1,0 +1,50 @@
+openapi: 3.0.3
+info:
+  title: HttpSinkV2 Demo API
+  version: "1.0.0"
+  description: >
+    API Gateway endpoint that receives Kafka records from the Confluent
+    HttpSinkV2 connector and stores each payload in S3.
+
+# Base URL = API Gateway invoke URL up to (but not including) the resource path.
+servers:
+  - url: https://MY_API_BASE_URL.execute-api.us-east-2.amazonaws.com/demo
+
+paths:
+  /records:
+    post:
+      operationId: sendRecord
+      summary: Store a Kafka record payload in S3
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Record stored successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  bucket:
+                    type: string
+                  key:
+                    type: string
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+
+security:
+  - ApiKeyAuth: []

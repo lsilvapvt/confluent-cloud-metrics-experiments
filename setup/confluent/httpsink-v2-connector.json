@@ -1,0 +1,21 @@
+{
+  "connector.class": "HttpSinkV2",
+  "name": "httpsink-v2-demo",
+  "topics": "MY_TOPIC_NAME_GOES_HERE",
+  "input.data.format": "AVRO",
+  "kafka.auth.mode": "KAFKA_API_KEY",
+  "kafka.api.key": "MY_API_KEY_GOES_HERE",
+  "kafka.api.secret": "MY_API_SECRET_GOES_HERE",
+  "http.api.base.url": "https://MY_API_BASE_URL.execute-api.us-east-2.amazonaws.com/demo",
+  "apis.num": "1",
+  "api1.http.api.path": "/records",
+  "api1.topics": "MY_TOPIC_NAME_GOES_HERE",
+  "api1.request.method": "POST",
+  "api1.request.body.format": "json",
+  "api.key.location": "HEADER",
+  "api1.http.request.headers": "x-api-key:MY_API_KEY_GOES_HERE",
+  "auth.type": "NONE",
+  "behavior.on.error": "fail",
+  "consumer.override.auto.offset.reset": "latest",
+  "tasks.max": "3"
+}

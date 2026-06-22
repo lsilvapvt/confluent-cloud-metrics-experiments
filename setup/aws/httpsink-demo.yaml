@@ -1,0 +1,237 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Demo backend for the Confluent HttpSinkV2 connector.
+  Provisions an HTTP front door (API Gateway) that invokes a Lambda function,
+  which persists each incoming JSON payload as an object in an S3 bucket.
+  Flow:  HttpSinkV2  ->  API Gateway (POST /records)  ->  Lambda  ->  S3
+
+# ---------------------------------------------------------------------------
+# Parameters - customize these at deploy time so the stack is easy to tailor
+# and to tear down after the demo.
+# ---------------------------------------------------------------------------
+Parameters:
+  ResourcePrefix:
+    Type: String
+    Default: ldasilva-httpsink-demo
+    Description: >
+      Lowercase prefix applied to all resource names (also used for the S3
+      bucket name). Keep it short and DNS-safe.
+    AllowedPattern: "^[a-z0-9][a-z0-9-]{1,40}$"
+    ConstraintDescription: Lowercase letters, numbers and hyphens only (2-41 chars).
+
+  ApiStageName:
+    Type: String
+    Default: demo
+    Description: API Gateway stage name (appears in the invoke URL path).
+    AllowedPattern: "^[a-zA-Z0-9_-]{1,32}$"
+
+  ApiKeyValue:
+    Type: String
+    Default: ChangeMeHttpSinkDemoKey0123456789
+    NoEcho: true
+    MinLength: 20
+    MaxLength: 128
+    Description: >
+      API key value the connector must send in the 'x-api-key' header.
+      Change this before deploying to anything you care about.
+
+  LambdaTimeout:
+    Type: Number
+    Default: 30
+    MinValue: 3
+    MaxValue: 900
+    Description: Lambda timeout in seconds.
+
+  LambdaMemorySize:
+    Type: Number
+    Default: 256
+    MinValue: 128
+    MaxValue: 3008
+    Description: Lambda memory size in MB.
+
+# ---------------------------------------------------------------------------
+# Resources
+# ---------------------------------------------------------------------------
+Resources:
+
+  # --- S3 bucket: lands every payload the connector sends -------------------
+  PayloadBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BucketName: !Sub "${ResourcePrefix}-${AWS::AccountId}-${AWS::Region}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # --- IAM role the Lambda assumes -----------------------------------------
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ResourcePrefix}-lambda-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: write-to-payload-bucket
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub "${PayloadBucket.Arn}/*"
+
+  # --- Lambda: writes the request body to S3 -------------------------------
+  PayloadLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ResourcePrefix}-handler"
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: !Ref LambdaTimeout
+      MemorySize: !Ref LambdaMemorySize
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref PayloadBucket
+      Code:
+        ZipFile: |
+          import base64
+          import datetime
+          import json
+          import os
+          import uuid
+
+          import boto3
+
+          s3 = boto3.client("s3")
+          BUCKET = os.environ["BUCKET_NAME"]
+
+
+          def handler(event, context):
+              body = event.get("body") or ""
+              if event.get("isBase64Encoded"):
+                  body = base64.b64decode(body).decode("utf-8")
+
+              now = datetime.datetime.utcnow()
+              key = "records/{}/{}.json".format(
+                  now.strftime("%Y/%m/%d/%H"), uuid.uuid4()
+              )
+
+              s3.put_object(
+                  Bucket=BUCKET,
+                  Key=key,
+                  Body=body.encode("utf-8"),
+                  ContentType="application/json",
+              )
+
+              return {
+                  "statusCode": 200,
+                  "headers": {"Content-Type": "application/json"},
+                  "body": json.dumps({"status": "ok", "bucket": BUCKET, "key": key}),
+              }
+
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref PayloadLambda
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*/POST/records"
+
+  # --- API Gateway (REST) ---------------------------------------------------
+  RestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub "${ResourcePrefix}-api"
+      Description: HTTP front door for the HttpSinkV2 demo.
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  RecordsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !GetAtt RestApi.RootResourceId
+      PathPart: records
+
+  RecordsPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref RecordsResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      ApiKeyRequired: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PayloadLambda.Arn}/invocations"
+
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: RecordsPostMethod
+    Properties:
+      RestApiId: !Ref RestApi
+
+  ApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      RestApiId: !Ref RestApi
+      DeploymentId: !Ref ApiDeployment
+      StageName: !Ref ApiStageName
+
+  # --- API key + usage plan (simple auth for the demo) ----------------------
+  ApiKey:
+    Type: AWS::ApiGateway::ApiKey
+    DependsOn: ApiStage
+    Properties:
+      Name: !Sub "${ResourcePrefix}-key"
+      Enabled: true
+      Value: !Ref ApiKeyValue
+
+  UsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    DependsOn: ApiStage
+    Properties:
+      UsagePlanName: !Sub "${ResourcePrefix}-usage-plan"
+      ApiStages:
+        - ApiId: !Ref RestApi
+          Stage: !Ref ApiStageName
+
+  UsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties:
+      KeyId: !Ref ApiKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref UsagePlan
+
+# ---------------------------------------------------------------------------
+# Outputs
+# ---------------------------------------------------------------------------
+Outputs:
+  InvokeUrl:
+    Description: Endpoint to set as 'http.api.url' in the HttpSinkV2 connector.
+    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiStageName}/records"
+
+  BucketName:
+    Description: S3 bucket where payloads land.
+    Value: !Ref PayloadBucket
+
+  ApiKeyHeaderHint:
+    Description: Header the connector must send (value is the ApiKeyValue parameter).
+    Value: "x-api-key: <ApiKeyValue parameter>"

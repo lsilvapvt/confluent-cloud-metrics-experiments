@@ -1,0 +1,8 @@
+# Secrets / credentials — never commit
+.env
+.env.*
+
+# Generated metrics output
+*.html
+lag.csv
+consumer_lag.html
