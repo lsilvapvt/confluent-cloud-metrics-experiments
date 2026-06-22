@@ -10,7 +10,7 @@ This works because the MCP server exposes the tools that an LLM needs:
 
 ## Prerequisites
 
-- The Confluent MCP server is connected in your IDE/LLM. [documentation]{https://docs.confluent.io/cloud/current/ai/ai-tools/managed-mcp-server.html}
+- The Confluent MCP server is connected in your IDE/LLM - [documentation](https://docs.confluent.io/cloud/current/ai/ai-tools/managed-mcp-server.html)
 
 - You know your **environment ID**, **Kafka cluster ID**, and the **connector name** (or its ID) you want to inspect.
 
