@@ -56,8 +56,8 @@ the AWS outputs:
 ```bash
 confluent connect cluster create \
   --config-file setup/confluent/httpsink-v2-connector.json \
-  --environment env-kwyxd6 \
-  --cluster lkc-jk7kdp
+  --environment env-xxxxxx \
+  --cluster lkc-xxxxxx
 ```
 
 Already created it and just changing config? Update it instead (get the
