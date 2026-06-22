@@ -75,6 +75,8 @@ skips launching the browser). The page contains:
 - **Chart 1** — average message lag per task over time.
 - **Chart 2** — messages produced per second over time.
 
+<img src="script-html-output.png" alt="HTML dashboard output: summary cards plus lag-per-task and production-rate charts" style="max-width: 100%;" />
+
 The time-lag estimate answers "roughly how far behind in *time* is each task?":
 
 ```
@@ -139,4 +141,5 @@ schedule:
 - The Metrics API has a short ingestion delay; the most recent minute or two may
   be missing or revised.
 - For ad-hoc spot checks you can skip the script entirely and use the Confluent
-  MCP `query_metrics` tool from Claude Code.
+  MCP server from Claude Code — see [`mcp-prompt.md`](mcp-prompt.md) for a
+  parameterized prompt that produces the same lag/task and time-lag analysis.
