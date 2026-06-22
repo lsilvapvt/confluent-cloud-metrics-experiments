@@ -16,7 +16,6 @@ API Gateway  ──►  Lambda  ──►  S3 bucket   (created in setup/aws)
 - The AWS stack from [`setup/aws`](../aws/README.md) is deployed, and you have
   its **InvokeUrl** and **ApiKeyValue**.
 - Confluent CLI v3+ installed and logged in (`confluent login`).
-- Access to environment `env-kwyxd6` and cluster `lkc-jk7kdp`.
 
 ## Files
 
