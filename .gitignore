@@ -1,3 +1,7 @@
+# macOS metadata
+.DS_Store
+**/.DS_Store
+
 # Secrets / credentials — never commit
 .env
 .env.*
@@ -6,3 +10,4 @@
 *.html
 lag.csv
 consumer_lag.html
+

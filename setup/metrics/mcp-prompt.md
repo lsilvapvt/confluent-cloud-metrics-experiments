@@ -10,7 +10,7 @@ This works because the MCP server exposes the tools that an LLM needs:
 
 ## Prerequisites
 
-- The Confluent MCP server is connected in your IDE/LLM - [documentation](https://docs.confluent.io/cloud/current/ai/ai-tools/managed-mcp-server.html)
+- The Confluent MCP server is connected in your IDE/LLM. [documentation]{https://docs.confluent.io/cloud/current/ai/ai-tools/managed-mcp-server.html}
 
 - You know your **environment ID**, **Kafka cluster ID**, and the **connector name** (or its ID) you want to inspect.
 
@@ -52,6 +52,13 @@ Do the following and show your work:
    caveats (e.g. a large backlog inflating the time-lag estimate, or the
    Metrics API's short ingestion delay).
 ```
+
+> 💡 Prefer a reusable command over pasting this prompt? Install it as a Claude
+> Code skill — see [`connector-lag-skill-setup.md`](connector-lag-skill-setup.md)
+> (skill definition: [`connector-lag-SKILL.md`](connector-lag-SKILL.md)).
+> Using GitHub Copilot instead? Install it as a prompt file — see
+> [`connector-lag-copilot-prompt-setup.md`](connector-lag-copilot-prompt-setup.md)
+> (prompt file: [`.github/prompts/connector-lag.prompt.md`](../../.github/prompts/connector-lag.prompt.md)).
 
 ## Notes
 
